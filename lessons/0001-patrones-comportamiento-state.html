@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 1 — Patrones de comportamiento y State</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<main>
+
+<header class="fade-in stagger-1">
+  <div class="card-glass" style="display:inline-block; text-align:center;">
+    <a href="../index.html" style="text-decoration:none; color:inherit;">
+      <h2>← Volver a la página maestra</h2>
+    </a>
+    <h1>Lección 1: Patrones de comportamiento y <code>State</code></h1>
+    <p class="small" style="margin:var(--space-2) 0 0 0;">Curso de patrones de diseño · Foco en comportamiento · Ejemplos en <b>Python</b></p>
+  </div>
+</header>
+
+<!-- Fase 6: Ultramock — Hero con chasis 3D -->
+<section class="hero fade-in stagger-2">
+  <div class="hero-frame">
+    <div class="hero-chasis">
+      <div class="specular"></div>
+      <h2 style="margin-top:0; font-size:2rem;">¿Qué resuelve <code>State</code>?</h2>
+      <p style="font-size:1.1rem; color:var(--text-muted); max-width:600px; margin:0 auto;">
+        Permite que un objeto cambie su comportamiento cuando su estado interno cambia, sin llenar el código de condicionales imposibles de mantener.
+      </p>
+      <div class="metric" style="margin-top:var(--space-6);">Python 3 · Estándar · Sin dependencias</div>
+    </div>
+  </div>
+</section>
+
+<!-- Misión de la lección -->
+<section class="mission-card card-glass fade-in stagger-3">
+  <h2>¿Por qué esta lección ahora?</h2>
+  <p>Ya viste que los patrones se dividen en tres familias: <strong>creacional</strong>, <strong>estructural</strong> y <strong>comportamiento</strong>. Esta lección se queda solo con la tercera y te muestra por qué <code>State</code> es uno de sus miembros más útiles para exponer y para implementar en proyectos reales.</p>
+</section>
+
+<!-- 1. Las tres familias -->
+<section class="fade-in">
+  <h2>1. Los tres tipos de patrones (repaso rápido)</h2>
+  <table>
+    <thead>
+      <tr><th>Familia</th><th>Qué resuelve</th><th>Ejemplos</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Creacional</strong></td>
+        <td>Cómo crear objetos sin acoplarse a clases concretas</td>
+        <td>Singleton, Factory Method, Builder, Prototype, Abstract Factory</td>
+      </tr>
+      <tr>
+        <td><strong>Estructural</strong></td>
+        <td>Cómo componer clases y objetos para formar estructuras más grandes</td>
+        <td>Adapter, Decorator, Proxy, Composite, Bridge, Flyweight, Facade</td>
+      </tr>
+      <tr>
+        <td><strong>Comportamiento</strong></td>
+        <td>Cómo se comunican y reparten responsabilidades los objetos</td>
+        <td><strong>State</strong>, Strategy, Observer, Command, Mediator, Memento, Visitor</td>
+      </tr>
+    </tbody>
+  </table>
+  <blockquote>
+    Los patrones de comportamiento no hablan de cómo se <em>construye</em> el código, sino de cómo <em>fluye la lógica de negocio</em>. Ahí es donde más se nota la diferencia entre código difícil de mantener y código flexible.
+  </blockquote>
+</section>
+
+<!-- 2. Qué es State -->
+<section class="card-glass fade-in">
+  <h2>2. Qué es <code>State</code> en una frase</h2>
+  <p><code>State</code> permite que un objeto cambie su comportamiento cuando su estado interno cambia. Parece que el objeto cambió de clase, pero en realidad delega en un objeto de estado diferente.</p>
+  <p><strong>Analogía:</strong> una máquina expendedora. Es la misma máquina, pero su comportamiento depende de si tiene dinero insertado, si ya dispensó el producto, o si está sin dinero.</p>
+</section>
+
+<!-- 3. State vs Strategy -->
+<section class="fade-in">
+  <h2>3. <code>State</code> vs <code>Strategy</code> (la confusión más común)</h2>
+  <table>
+    <thead>
+      <tr><th>Aspecto</th><th>State</th><th>Strategy</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>¿Quién decide el comportamiento?</td>
+        <td>El objeto mismo, según su estado interno</td>
+        <td>El cliente, desde afuera</td>
+      </tr>
+      <tr>
+        <td>¿Cambia durante la ejecución?</td>
+        <td>Sí, el objeto transita entre estados</td>
+        <td>Generalmente no, el cliente lo fija</td>
+      </tr>
+      <tr>
+        <td>¿Cuándo usarlo?</td>
+        <td>Cuando el comportamiento depende de un estado que el objeto gestiona solo</td>
+        <td>Cuando el comportamiento lo elige el usuario o el cliente</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4. Ejemplo en Python -->
+<section class="card-glass fade-in">
+  <h2>4. Tu primera victoria tangible — Estado de un pedido en Python</h2>
+  <p>Imagina un <code>Pedido</code> que pasa de <code>Pendiente</code> a <code>Pagado</code> y luego a <code>Enviado</code>. Sin <code>State</code> terminarías con <code>if/else</code> en cada método. Con <code>State</code>, cada estado vive en su propia clase.</p>
+
+  <pre><code class="language-python">from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+# ---------------------------------------------------------------------------
+# Interfaz State
+# ---------------------------------------------------------------------------
+class EstadoPedido(ABC):
+    @abstractmethod
+    def pagar(self, pedido: "Pedido") -> None:
+        ...
+
+    @abstractmethod
+    def enviar(self, pedido: "Pedido") -> None:
+        ...
+
+    @abstractmethod
+    def cancelar(self, pedido: "Pedido") -> None:
+        ...
+
+
+# ---------------------------------------------------------------------------
+# ConcreteState: Pendiente
+# ---------------------------------------------------------------------------
+class Pendiente(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        pedido.estado = Pagado()
+        print("Pago aceptado. Pedido ahora está pagado.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("No se puede enviar: el pedido aún no se ha pagado.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        pedido.estado = Cancelado()
+        print("Pedido cancelado antes de pagar.")
+
+
+# ---------------------------------------------------------------------------
+# ConcreteState: Pagado
+# ---------------------------------------------------------------------------
+class Pagado(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        print("El pedido ya está pagado.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        pedido.estado = Enviado()
+        print("Pedido enviado al cliente.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("No se puede cancelar: ya se envió o está pagado.")
+
+
+# ---------------------------------------------------------------------------
+# ConcreteState: Enviado
+# ---------------------------------------------------------------------------
+class Enviado(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        print("Ya se envió el pedido. No se puede pagar.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("El pedido ya fue enviado.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("No se puede cancelar un pedido ya enviado.")
+
+
+# ---------------------------------------------------------------------------
+# ConcreteState: Cancelado
+# ---------------------------------------------------------------------------
+class Cancelado(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        print("El pedido está cancelado. No se puede pagar.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("El pedido está cancelado. No se puede enviar.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("El pedido ya está cancelado.")
+
+
+# ---------------------------------------------------------------------------
+# Context
+# ---------------------------------------------------------------------------
+class Pedido:
+    def __init__(self) -> None:
+        self.estado: EstadoPedido = Pendiente()
+
+    def pagar(self) -> None:
+        self.estado.pagar(self)
+
+    def enviar(self) -> None:
+        self.estado.enviar(self)
+
+    def cancelar(self) -> None:
+        self.estado.cancelar(self)
+
+
+# ---------------------------------------------------------------------------
+# Prueba
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    p = Pedido()
+    p.pagar()   # Pago aceptado. Pedido ahora está pagado.
+    p.enviar()  # Pedido enviado al cliente.
+    p.pagar()   # Ya se envió el pedido. No se puede pagar.
+    p.cancelar()  # No se puede cancelar un pedido ya enviado.</code></pre>
+</section>
+
+<!-- 5. Quiz -->
+<section class="quiz fade-in">
+  <h2>5. Mini-prueba (tres preguntas)</h2>
+  <form id="quiz1">
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">1. ¿A qué familia pertenece <code>State</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="a"> Creacional</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="b"> Estructural</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="c"> Comportamiento</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">2. ¿Quién decide el comportamiento en <code>State</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="a"> El cliente, desde afuera</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="b"> El objeto mismo, según su estado interno</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="c"> Una clase fábrica externa</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">3. ¿Cuál es la diferencia principal entre <code>State</code> y <code>Strategy</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="a"> No hay diferencia, son lo mismo</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="b"> State lo decide el objeto, Strategy lo elige el cliente</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="c"> Strategy usa más clases que State</label>
+    </fieldset>
+
+    <button type="button" class="btn btn-primary" onclick="checkQuiz()">Revisar respuestas</button>
+  </form>
+  <div id="feedback1" class="feedback"></div>
+</section>
+
+<!-- 6. Fuente y cierre -->
+<section class="card-glass fade-in">
+  <h2>6. Fuente primaria recomendada</h2>
+  <p>Antes de la próxima sesión, lee: <a href="https://refactoring.guru/es/design-patterns/state" target="_blank" rel="noopener noreferrer">State pattern — Refactoring Guru (español)</a>. Es la explicación más clara y visual del patrón para repasar antes de una exposición.</p>
+</section>
+
+<footer class="footer fade-in">
+  <p><strong>Recordatorio:</strong> si algo no queda claro, pregúntame directamente. Yo soy tu profesor en este proceso y puedo ayudar con cualquier duda sobre esta lección.</p>
+  <p><small>Lección 1 de la serie "Patrones de Diseño — State". Próxima lección: anatomía completa de <code>State</code> con diagrama de clases.</small></p>
+</footer>
+
+</main>
+
+<script>
+function checkQuiz() {
+  const answers = { q1: 'c', q2: 'b', q3: 'b' };
+  const form = document.getElementById('quiz1');
+  const feedback = document.getElementById('feedback1');
+  let correct = 0;
+  let total = 0;
+
+  for (const [key, correctVal] of Object.entries(answers)) {
+    const radios = form.elements[key];
+    let chosen = null;
+    for (const radio of radios) {
+      if (radio.checked) chosen = radio.value;
+    }
+    total++;
+    if (chosen === correctVal) correct++;
+  }
+
+  feedback.style.display = 'block';
+  if (correct === total) {
+    feedback.className = 'feedback ok';
+    feedback.textContent = `Correcto: ${correct}/${total}. Entendiste la idea central de State y su diferencia con Strategy.`;
+  } else {
+    feedback.className = 'feedback err';
+    feedback.textContent = `Tienes ${correct}/${total} correctas. Repasa la sección 3 y vuelve a intentarlo.`;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 3 — Implementación mínima de State en Python</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<main>
+
+<header class="fade-in stagger-1">
+  <div class="card-glass" style="display:inline-block; text-align:center;">
+    <a href="../index.html" style="text-decoration:none; color:inherit;">
+      <h2 style="margin:0 0 var(--space-2) 0; font-size:1.1rem;">← Volver a la página maestra</h2>
+    </a>
+    <h1>Lección 3: Implementación mínima de <code>State</code> en Python</h1>
+    <p class="small" style="margin:var(--space-2) 0 0 0;">Código copiable, probado y listo para ejecutar · Máquina de estados con 3 estados</p>
+  </div>
+</header>
+
+<!-- Fase 6: Ultramock — Hero con chasis 3D -->
+<section class="hero fade-in stagger-2">
+  <div class="hero-frame">
+    <div class="hero-chasis">
+      <div class="specular"></div>
+      <h2 style="margin-top:0; font-size:2rem;">Tu primera máquina de estados</h2>
+      <p style="font-size:1.1rem; color:var(--text-muted); max-width:600px; margin:0 auto;">
+        Un <code>Pedido</code> que pasa de <code>Pendiente</code> a <code>Pagado</code> y luego a <code>Enviado</code>, con transiciones inválidas bloqueadas automáticamente.
+      </p>
+      <div class="metric" style="margin-top:var(--space-6);">Python 3 · Estándar · 20 min</div>
+    </div>
+  </div>
+</section>
+
+<!-- Misión de la lección -->
+<section class="mission-card card-glass fade-in stagger-3">
+  <h2>¿Por qué esta lección ahora?</h2>
+  <p>Ya conoces la anatomía de <code>State</code>. Ahora vas a escribir el código completo, ejecutarlo tú mismo y ver cómo el comportamiento cambia según el estado sin un solo <code>if estado == ...</code>.</p>
+</section>
+
+<!-- 1. Antes y después -->
+<section class="fade-in">
+  <h2>1. El problema que resuelve <code>State</code></h2>
+  <div class="bento-grid">
+    <article class="card-glass fade-in" style="padding:var(--space-6); border-left:4px solid rgba(248,113,113,0.5);">
+      <div class="badge" style="color:#fca5a5;">✘ Antes (sin State)</div>
+      <pre style="margin:var(--space-4) 0 0 0;"><code class="language-python">if estado == "pendiente":
+    if acción == "pagar":
+        estado = "pagado"
+    elif acción == "enviar":
+        print("No se puede enviar")
+elif estado == "pagado":
+    if acción == "enviar":
+        estado = "enviado"
+    ...</code></pre>
+    </article>
+    <article class="card-glass bento-wide fade-in" style="padding:var(--space-6); border-left:4px solid rgba(16,185,129,0.5);">
+      <div class="badge" style="color:#6ee7b7;">✔ Después (con State)</div>
+      <p style="margin:var(--space-4) 0 0 0; font-size:0.95rem;">Cada estado es una clase. El <code>Context</code> solo delega. Agregar un nuevo estado no toca el <code>Context</code>.</p>
+    </article>
+  </div>
+</section>
+
+<!-- 2. Código completo -->
+<section class="card-glass fade-in">
+  <h2>2. Código completo (copia y ejecuta)</h2>
+  <p class="small">Guárdalo como <code>estado_pedido.py</code> y ejecútalo con <code>python estado_pedido.py</code>.</p>
+  <pre><code class="language-python">from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+# ============================================================================
+# STATE — Interfaz común de todos los estados
+# ============================================================================
+class EstadoPedido(ABC):
+    """Cada estado concreto implementa estos tres métodos."""
+
+    @abstractmethod
+    def pagar(self, pedido: "Pedido") -> None:
+        ...
+
+    @abstractmethod
+    def enviar(self, pedido: "Pedido") -> None:
+        ...
+
+    @abstractmethod
+    def cancelar(self, pedido: "Pedido") -> None:
+        ...
+
+
+# ============================================================================
+# CONCRETESTATE — Una clase por estado real
+# ============================================================================
+class Pendiente(EstadoPedido):
+    """El pedido aún no se ha pagado."""
+
+    def pagar(self, pedido: "Pedido") -> None:
+        pedido.estado = Pagado()
+        print("Pago aceptado. El pedido ahora está pagado.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("No se puede enviar: el pedido aún no se ha pagado.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        pedido.estado = Cancelado()
+        print("Pedido cancelado antes de pagar.")
+
+
+class Pagado(EstadoPedido):
+    """El pedido se pagó pero aún no se envió."""
+
+    def pagar(self, pedido: "Pedido") -> None:
+        print("El pedido ya está pagado. No se puede pagar dos veces.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        pedido.estado = Enviado()
+        print("Pedido enviado al cliente.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("No se puede cancelar: el pedido ya está pagado o enviado.")
+
+
+class Enviado(EstadoPedido):
+    """El pedido ya fue despachado."""
+
+    def pagar(self, pedido: "Pedido") -> None:
+        print("Ya se envió el pedido. No se puede pagar.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("El pedido ya fue enviado previamente.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("No se puede cancelar un pedido ya enviado.")
+
+
+class Cancelado(EstadoPedido):
+    """Estado terminal: el pedido se canceló."""
+
+    def pagar(self, pedido: "Pedido") -> None:
+        print("El pedido está cancelado. No se puede pagar.")
+
+    def enviar(self, pedido: "Pedido") -> None:
+        print("El pedido está cancelado. No se puede enviar.")
+
+    def cancelar(self, pedido: "Pedido") -> None:
+        print("El pedido ya está cancelado.")
+
+
+# ============================================================================
+# CONTEXT — El objeto principal que delega en su estado actual
+# ============================================================================
+class Pedido:
+    """Mantiene una referencia al estado actual y delega cada operación."""
+
+    def __init__(self) -> None:
+        self.estado: EstadoPedido = Pendiente()
+
+    def pagar(self) -> None:
+        self.estado.pagar(self)
+
+    def enviar(self) -> None:
+        self.estado.enviar(self)
+
+    def cancelar(self) -> None:
+        self.estado.cancelar(self)
+
+
+# ============================================================================
+# PRUEBA — Ejecuta este bloque para ver el patrón en acción
+# ============================================================================
+if __name__ == "__main__":
+    p = Pedido()
+
+    print("=== Escenario feliz ===")
+    p.pagar()   # Pendiente → Pagado
+    p.enviar()  # Pagado → Enviado
+
+    print("\n=== Transiciones inválidas (bloqueadas) ===")
+    p.pagar()   # Enviado → No se puede pagar
+    p.cancelar()  # Enviado → No se puede cancelar</code></pre>
+</section>
+
+<!-- 3. Explicación por bloques -->
+<section class="fade-in">
+  <h2>3. ¿Qué hace cada bloque?</h2>
+  <table>
+    <thead>
+      <tr><th>Bloque</th><th>Rol en el patrón</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>EstadoPedido</code> (ABC)</td>
+        <td>Es el <strong>State</strong>. Declara el contrato que todos los estados deben cumplir.</td>
+      </tr>
+      <tr>
+        <td><code>Pendiente</code>, <code>Pagado</code>, <code>Enviado</code>, <code>Cancelado</code></td>
+        <td>Son los <strong>ConcreteState</strong>. Cada uno implementa su propio comportamiento y decide cuándo cambiar <code>pedido.estado</code>.</td>
+      </tr>
+      <tr>
+        <td><code>Pedido</code></td>
+        <td>Es el <strong>Context</strong>. No tiene condicionales <code>if estado == ...</code>; solo llama <code>self.estado.&lt;método&gt;(self)</code>.</td>
+      </tr>
+      <tr>
+        <td><code>if __name__ == "__main__":</code></td>
+        <td>Prueba rápida: recorre el camino feliz y luego intenta transiciones inválidas para ver que están bloqueadas.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4. Quiz -->
+<section class="quiz fade-in">
+  <h2>4. Mini-prueba (tres preguntas)</h2>
+  <form id="quiz3">
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">1. ¿Quién decide cuándo cambiar de estado en este código?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="a"> El objeto <code>Pedido</code> (Context)</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="b"> El cliente, desde fuera de la clase</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="c"> La clase de estado actual (ConcreteState)</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">2. ¿Qué pasa si llamas <code>pagar()</code> cuando el pedido ya está <code>Enviado</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="a"> Vuelve a <code>Pendiente</code></label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="b"> Se imprime "Ya se envió el pedido. No se puede pagar."</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="c"> Lanza una excepción</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">3. ¿Por qué no hay <code>if estado == ...</code> en la clase <code>Pedido</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="a"> Porque Python no lo permite</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="b"> Porque cada estado es una clase que encapsula su propio comportamiento</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="c"> Porque solo hay dos estados</label>
+    </fieldset>
+
+    <button type="button" class="btn btn-primary" onclick="checkQuiz()">Revisar respuestas</button>
+  </form>
+  <div id="feedback3" class="feedback"></div>
+</section>
+
+<!-- 5. Fuente -->
+<section class="card-glass fade-in">
+  <h2>Fuente primaria recomendada</h2>
+  <p>Refuerza lo aprendido con: <a href="https://refactoring.guru/es/design-patterns/state" target="_blank" rel="noopener noreferrer">State pattern — Refactoring Guru (español)</a>.</p>
+</section>
+
+<footer class="footer fade-in">
+  <p><strong>Recordatorio:</strong> si algo no queda claro, pregúntame directamente.</p>
+  <p><small>Lección 3 de la serie "Patrones de Diseño — State". Próxima lección: <code>State</code> vs <code>Strategy</code> — cuál elegir y cuándo combinarlos.</small></p>
+</footer>
+
+</main>
+
+<script>
+function checkQuiz() {
+  const answers = { q1: 'c', q2: 'b', q3: 'b' };
+  const form = document.getElementById('quiz3');
+  const feedback = document.getElementById('feedback3');
+  let correct = 0;
+  let total = 0;
+
+  for (const [key, correctVal] of Object.entries(answers)) {
+    const radios = form.elements[key];
+    let chosen = null;
+    for (const radio of radios) {
+      if (radio.checked) chosen = radio.value;
+    }
+    total++;
+    if (chosen === correctVal) correct++;
+  }
+
+  feedback.style.display = 'block';
+  if (correct === total) {
+    feedback.className = 'feedback ok';
+    feedback.textContent = `Correcto: ${correct}/${total}. Implementaste y entendiste State en Python.`;
+  } else {
+    feedback.className = 'feedback err';
+    feedback.textContent = `Tienes ${correct}/${total} correctas. Repasa las secciones 1 y 2 y vuelve a intentarlo.`;
+  }
+}
+</script>
+</body>
+</html>
