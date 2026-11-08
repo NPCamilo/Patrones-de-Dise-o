@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 5 — State con Observer y Command</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<main>
+
+<header class="fade-in stagger-1">
+  <div class="card-glass" style="display:inline-block; text-align:center;">
+    <a href="../index.html" style="text-decoration:none; color:inherit;">
+      <h2 style="margin:0 0 var(--space-2) 0; font-size:1.1rem;">← Volver a la página maestra</h2>
+    </a>
+    <h1>Lección 5: <code>State</code> con <code>Observer</code> y <code>Command</code></h1>
+    <p class="small" style="margin:var(--space-2) 0 0 0;">Notificar cambios de estado y hacer transiciones deshacibles</p>
+  </div>
+</header>
+
+<!-- Fase 6: Ultramock — Hero con chasis 3D -->
+<section class="hero fade-in stagger-2">
+  <div class="hero-frame">
+    <div class="hero-chasis">
+      <div class="specular"></div>
+      <h2 style="margin-top:0; font-size:2rem;">Cuando el estado cambia el mundo</h2>
+      <p style="font-size:1.1rem; color:var(--text-muted); max-width:600px; margin:0 auto;">
+        Un pedido pasa de <code>Pendiente</code> a <code>Pagado</code>, y el sistema notifica a envíos, facturación y permite deshacer la transición.
+      </p>
+      <div class="metric" style="margin-top:var(--space-6);">Python 3 · Estándar · 25 min</div>
+    </div>
+  </div>
+</section>
+
+<!-- Misión de la lección -->
+<section class="mission-card card-glass fade-in stagger-3">
+  <h2>¿Por qué esta lección ahora?</h2>
+  <p><code>State</code> rara vez viaja solo. En el mundo real, cambiar de estado debe avisar a otros módulos y, a veces, deshacerse. Esta lección muestra cómo combinar tres patrones de comportamiento sin sobre-ingeniería.</p>
+</section>
+
+<!-- 1. Observer: notificar al cambiar de estado -->
+<section class="fade-in">
+  <h2>1. <code>Observer</code>: avisar cuando cambia el estado</h2>
+  <p>El <code>Context</code> mantiene una lista de observadores y los notifica cada vez que transita a un nuevo estado.</p>
+  <pre><code class="language-python">from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import List
+
+
+# ---- Observer: suscriptores al cambio de estado ----
+class ObservadorPedido(ABC):
+    @abstractmethod
+    def actualizar(self, pedido: "Pedido", estado_anterior: str, estado_nuevo: str) -> None:
+        ...
+
+
+class NotificadorEmail(ObservadorPedido):
+    def actualizar(self, pedido, estado_anterior, estado_nuevo) -> None:
+        print(f"[Email] Pedido {pedido.id}: {estado_anterior} -> {estado_nuevo}")
+
+
+class LogAuditor(ObservadorPedido):
+    def actualizar(self, pedido, estado_anterior, estado_nuevo) -> None:
+        print(f"[Auditoria] {pedido.id} cambio de {estado_anterior} a {estado_nuevo}")
+
+
+# ---- State: estados del pedido ----
+class EstadoPedido(ABC):
+    @abstractmethod
+    def pagar(self, pedido: "Pedido") -> None: ...
+    @abstractmethod
+    def enviar(self, pedido: "Pedido") -> None: ...
+
+
+class Pendiente(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        pedido.cambiar_estado(Pagado())
+    def enviar(self, pedido: "Pedido") -> None:
+        print("No se puede enviar: aún no se ha pagado.")
+
+
+class Pagado(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        print("Ya está pagado.")
+    def enviar(self, pedido: "Pedido") -> None:
+        pedido.cambiar_estado(Enviado())
+
+
+class Enviado(EstadoPedido):
+    def pagar(self, pedido: "Pedido") -> None:
+        print("Ya se envió.")
+    def enviar(self, pedido: "Pedido") -> None:
+        print("Ya se envió previamente.")
+
+
+# ---- Context: Pedido con Observer embebido ----
+class Pedido:
+    def __init__(self, id_pedido: str) -> None:
+        self.id = id_pedido
+        self.estado: EstadoPedido = Pendiente()
+        self._observadores: List[ObservadorPedido] = []
+        self._estado_anterior: str = ""
+
+    def agregar_observador(self, observador: ObservadorPedido) -> None:
+        self._observadores.append(observador)
+
+    def cambiar_estado(self, nuevo_estado: EstadoPedido) -> None:
+        nombre_anterior = type(self.estado).__name__
+        nombre_nuevo = type(nuevo_estado).__name__
+        self._estado_anterior = nombre_anterior
+        self.estado = nuevo_estado
+        for obs in self._observadores:
+            obs.actualizar(self, nombre_anterior, nombre_nuevo)
+
+    def pagar(self) -> None:
+        self.estado.pagar(self)
+
+    def enviar(self) -> None:
+        self.estado.enviar(self)
+
+
+# ---- Uso ----
+if __name__ == "__main__":
+    p = Pedido("ORD-001")
+    p.agregar_observador(NotificadorEmail())
+    p.agregar_observador(LogAuditor())
+
+    print("=== Transición 1 ===")
+    p.pagar()   # Pendiente → Pagado (notifica a ambos observadores)
+
+    print("\n=== Transición 2 ===")
+    p.enviar()  # Pagado → Enviado (notifica a ambos observadores)</code></pre>
+</section>
+
+<!-- 2. Command: transiciones deshacibles -->
+<section class="card-glass fade-in">
+  <h2>2. <code>Command</code>: transiciones deshacibles</h2>
+  <p>Encapsula cada cambio de estado como un objeto comando, lo que permite registrar el historial y deshacer la última transición.</p>
+  <pre><code class="language-python">from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import List
+
+
+# ---- Command: interfaz de transición ----
+class ComandoTransicion(ABC):
+    @abstractmethod
+    def ejecutar(self) -> None: ...
+    @abstractmethod
+    def deshacer(self) -> None: ...
+
+
+class ComandoPagar(ComandoTransicion):
+    def __init__(self, pedido: "Pedido", estado_anterior: str) -> None:
+        self.pedido = pedido
+        self.estado_anterior = estado_anterior
+        self.estado_nuevo = type(pedido.estado).__name__
+
+    def ejecutar(self) -> None:
+        self.pedido.pagar()
+
+    def deshacer(self) -> None:
+        # Restaura el estado anterior de forma simplificada
+        mapa = {"Pendiente": Pendiente(), "Pagado": Pagado(), "Enviado": Enviado()}
+        self.pedido.estado = mapa[self.estado_anterior]
+        print(f"[Deshacer] {self.pedido.id} volvió a {self.estado_anterior}")
+
+
+# ---- Historial de comandos ----
+class HistorialTransiciones:
+    def __init__(self) -> None:
+        self._comandos: List[ComandoTransicion] = []
+
+    def agregar(self, comando: ComandoTransicion) -> None:
+        self._comandos.append(comando)
+
+    def deshacer_ultimo(self) -> None:
+        if not self._comandos:
+            print("No hay nada que deshacer")
+            return
+        comando = self._comandos.pop()
+        comando.deshacer()</code></pre>
+</section>
+
+<!-- 3. Comparativa: State solo vs State + Observer + Command -->
+<section class="fade-in">
+  <h2>3. ¿Cuándo usar cada combinación?</h2>
+  <table>
+    <thead>
+      <tr><th>Escenario</th><th>Patrones</th><th>Por qué</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Solo necesitas cambiar comportamiento por estado</td>
+        <td><code>State</code></td>
+        <td>Mínimo acoplamiento, código limpio.</td>
+      </tr>
+      <tr>
+        <td>Otros módulos deben enterarse del cambio de estado</td>
+        <td><code>State</code> + <code>Observer</code></td>
+        <td>El contexto notifica sin conocer quién escucha.</td>
+      </tr>
+      <tr>
+        <td>Necesitas deshacer la última transición de estado</td>
+        <td><code>State</code> + <code>Command</code></td>
+        <td>Cada transición es un objeto reversible.</td>
+      </tr>
+      <tr>
+        <td>Notificar y deshacer al mismo tiempo</td>
+        <td><code>State</code> + <code>Observer</code> + <code>Command</code></td>
+        <td>Control total del ciclo de vida con historial.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Quiz -->
+<section class="quiz fade-in">
+  <h2>4. Mini-prueba (tres preguntas)</h2>
+  <form id="quiz5">
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">1. ¿Qué hace <code>Observer</code> al combinarse con <code>State</code>?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="a"> Cambia el estado del objeto automáticamente</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="b"> Notifica a otros módulos cuando el estado cambia</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q1" value="c"> Elimina la necesidad de clases de estado</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">2. ¿Qué permite <code>Command</code> en este contexto?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="a"> Hacer transiciones de estado deshacibles</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="b"> Ejecutar estados en paralelo</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q2" value="c"> Generar estados automáticamente</label>
+    </fieldset>
+
+    <fieldset style="border:none; padding:0; margin:0 0 var(--space-6) 0;">
+      <legend style="font-weight:600; color:var(--text); margin-bottom:var(--space-2); font-size:1rem;">3. ¿Cuándo NO necesitas combinar <code>State</code> con otros patrones?</legend>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="a"> Cuando solo necesitas cambiar comportamiento por estado interno</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="b"> Cuando hay muchos estados</label>
+      <label style="display:block; margin:var(--space-2) 0;"><input type="radio" name="q3" value="c"> Cuando usas Python</label>
+    </fieldset>
+
+    <button type="button" class="btn btn-primary" onclick="checkQuiz()">Revisar respuestas</button>
+  </form>
+  <div id="feedback5" class="feedback"></div>
+</section>
+
+<section class="card-glass fade-in">
+  <h2>Fuente primaria recomendada</h2>
+  <p><a href="https://refactoring.guru/es/design-patterns/state" target="_blank" rel="noopener noreferrer">State pattern</a>, <a href="https://refactoring.guru/es/design-patterns/observer" target="_blank" rel="noopener noreferrer">Observer pattern</a> y <a href="https://refactoring.guru/es/design-patterns/command" target="_blank" rel="noopener noreferrer">Command pattern</a> — Refactoring Guru (español).</p>
+</section>
+
+<footer class="footer fade-in">
+  <p><strong>Recordatorio:</strong> si algo no queda claro, pregúntame directamente.</p>
+  <p><small>Lección 5 de la serie "Patrones de Diseño — State". Esta es la última lección del curso.</small></p>
+</footer>
+
+</main>
+
+<script>
+function checkQuiz() {
+  const answers = { q1: 'b', q2: 'a', q3: 'a' };
+  const form = document.getElementById('quiz5');
+  const feedback = document.getElementById('feedback5');
+  let correct = 0;
+  let total = 0;
+
+  for (const [key, correctVal] of Object.entries(answers)) {
+    const radios = form.elements[key];
+    let chosen = null;
+    for (const radio of radios) {
+      if (radio.checked) chosen = radio.value;
+    }
+    total++;
+    if (chosen === correctVal) correct++;
+  }
+
+  feedback.style.display = 'block';
+  if (correct === total) {
+    feedback.className = 'feedback ok';
+    feedback.textContent = `Correcto: ${correct}/${total}. Combinas State con Observer y Command con criterio.`;
+  } else {
+    feedback.className = 'feedback err';
+    feedback.textContent = `Tienes ${correct}/${total} correctas. Repasa las secciones 1 y 2 y vuelve a intentarlo.`;
+  }
+}
+</script>
+</body>
+</html>
